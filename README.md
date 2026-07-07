@@ -8,7 +8,7 @@ This repo contains utilities for benchmarking multimodal large language models (
 - `eval_gpt_closedset.py`, `eval_gpt_openset.py`: GPT-4.1 evaluators for closed/open-set tasks.
 - `eval_gemini_closedset.py`, `eval_gemini_openset.py`: Gemini 2.5 Pro evaluators for closed/open-set tasks.
 - `preference.py`: central configuration for model identifiers and optional API keys. Update the values inside this file if you host checkpoints locally.
-- `datasets/`: expected location for the EgoCross benchmark JSON files (`all_questions_merged_full.json`, `all_questions_merged_full_imgs_id.json`, etc.).
+- `datasets/`: expected location for the EgoCross benchmark JSON file `egocross_testbed_imgs.json`.
 
 ## Environment Setup
 
@@ -44,7 +44,7 @@ After installation, update `preference.py` with the necessary API keys (OpenAI, 
 
 1. **Model identifiers**: `preference.py` contains default Hugging Face repo IDs. Replace them with local checkpoints if running fully offline.
 2. **CUDA device**: select GPUs via the `CUDA_VISIBLE_DEVICES` environment variable as usual.
-3. **Dataset**: place the EgoCross QA JSON file inside `datasets/`. The default argument expects `datasets/all_questions_merged_full.json`; adjust with `--dataset_path` if you use a different file (e.g., `datasets/all_questions_merged_full_imgs_id.json`).
+3. **Dataset**: place the EgoCross QA JSON file inside `datasets/`. To compute accuracy, the evaluators need the answer-bearing file `egocross_testbed_answers.json` (see [Answers & Offline Evaluation](#answers--offline-evaluation)) — download it from the [EgoCross HuggingFace dataset](https://huggingface.co/datasets/myuniverse/EgoCross) into this folder, or point `--dataset_path` to it directly. `egocross_testbed_imgs.json` (questions only) is what challenge participants used for generating predictions.
 
 ## Usage
 
@@ -53,7 +53,7 @@ Example command mirroring the previous workflow (Qwen2.5-VL closed-set evaluatio
 ```bash
 CUDA_VISIBLE_DEVICES=3 python eval_os_closedset.py \
   --model_name qwen25vl \
-  --dataset_path datasets/all_questions_merged_full_imgs_id.json \
+  --dataset_path datasets/egocross_testbed_imgs.json \
   --output_dir results-egocross-testbed/closedset-Qwen25VL
 ```
 
@@ -67,8 +67,26 @@ Key flags:
 
 The script writes a timestamped JSON summary into `--output_dir`, containing both per-sample predictions and aggregated accuracy.
 
+## Answers & Offline Evaluation
+
+The 1st Cross-Domain EgoCross Challenge ([Source-Limited Track](https://www.codabench.org/competitions/11279/), [Open-Source Track](https://www.codabench.org/competitions/13868/); EgoVis Workshop @ CVPR 2026) concluded in May 2026. The **ground-truth answers** for all 957 testbed questions are now released, so evaluation can be run and scored fully offline without submitting to Codabench.
+
+- Download `egocross_testbed/egocross_testbed_answers.json` from the [EgoCross HuggingFace dataset](https://huggingface.co/datasets/myuniverse/EgoCross) (gated access — request access on the dataset page first).
+- It contains the same 957 questions as `egocross_testbed_imgs.json` (matched 1:1 by `id`), plus `correct_option_letter`, `answer_text`, `detailed_answer`, and a globally unique `question_id`.
+- The evaluators in this repo (`eval_os_closedset.py`, `eval_gpt_*`, `eval_gemini_*`) read `correct_option_letter` / `answer_text` to compute accuracy, so point `--dataset_path` at the answers file:
+
+```bash
+CUDA_VISIBLE_DEVICES=3 python eval_os_closedset.py \
+  --model_name qwen25vl \
+  --dataset_path datasets/egocross_testbed_answers.json \
+  --output_dir results-egocross-testbed/closedset-Qwen25VL
+```
+
+⚠️ **Do not train on the testbed.** The answers are released for evaluation and analysis only; please do not include the testbed questions or answers in any training corpus.
+
 ## Notes
 
+- The official/reference evaluation scripts can be found at [EgoCrossCodes](https://github.com/EgoCross-Benchmark/EgoCrossCodes).
 - InternVL loading requires `qwen_vl_utils.process_vision_info` and the model-specific `chat` API; ensure the respective repositories are installed.
 - The pipeline assumes CUDA execution (`tensor.cuda()`). For CPU-only or other accelerator setups, additional adjustments are required.
 - API-based evaluators (`eval_gpt_*`, `eval_gemini_*`) invoke external services; populate the relevant API keys in `preference.py` before running them.
